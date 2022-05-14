@@ -1,18 +1,17 @@
-%function ObjVecTrackingPreprocessor
-% ObjVecTrackingPreprocessor  2D Tracking PostProcessing
-%   ObjVecTrackingPreprocessor takes in a dvt file and writes a .mat file with a
-%   name starting with the name of the dvt file. The .mat file has
-%   interpolated light data up to acceptable gap sizes as well as an
-%   added "light" that is the average of the first two lights.
+%% ObjVecTrackingPreprocessor - 2D Tracking PostProcessing
+% ObjVecTrackingPreprocessor takes in a dvt file and writes a .mat file with a
+% name starting with the name of the dvt file. The .mat file has
+% interpolated light data up to acceptable gap sizes as well as an
+% added "light" that is the average of the first two lights.
 %
-%   This also includes velocity, acceleration, and head direction.
+% This also includes velocity, acceleration, and head direction.
 %
 %
-%   Non-built-in functions called:
-%        inpaint_nans
+% Non-built-in functions called:
+%      inpaint_nans
 %
-%   Written by Jingyue Xu, 202203317
-%   Adopted from TTTrackingPreprocessor.m by Jake Olson, October 2014
+% Written by Jingyue Xu, 202203317
+% Adopted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
 % Prompt user to select file. Will save back to the same folder.
 [dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
@@ -78,7 +77,7 @@ for iLight = 1:nRealLights
 %             gapStarts = [1;gapStarts];
 %         end
         if gapStarts(end) > gapEnds(end) % Lost tracking at end. Common.
-            gapEnds = [gapEnds;length(workingDVT)+1];
+            gapEnds = [gapEnds;length(workingDVT)+1]; %#ok<AGROW>
         end
         gapLengths = gapEnds - gapStarts;
         
@@ -108,7 +107,7 @@ indRecStruct.samplesLost = samplesLost;
 indRecStruct.samplesFilled = samplesFilled;
 indRecStruct.samplesUnfilled = samplesUnfilled;
 
-clear gap* iGap iLight lightCol* lostTrackingEdges unfixableGaps
+clear gap* iGap iLight lightCol* lostTrackingEdges unfixableGaps maxGap
 
 %% Create a "light" and add to DVT matrix that is the average of the first two lights.
 % Var Init
@@ -145,7 +144,7 @@ workingDVT(any(samplesUnfilled,2),(1+mashupLight*2):(2+mashupLight*2)) = 1;
 
 % Fill spots where we can't average but do have 1 light (lost 1 light).
 for iLight = 1:nRealLights
-    %Indices of the light columns in the dvt matrix.
+    % Indices of the light columns in the dvt matrix.
     lightColX = 1+iLight*2;
     lightColY = 2+iLight*2;
     thisLightIsGood = ~samplesUnfilled(:,iLight);
@@ -161,6 +160,7 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 
 %% Create relative DVT for object-centered position
 % Edit objPosition to adapt the code to actual data
+% Apply a transformation matrix to rotate DVT to object-relative position
 % This code block is written assuming there are 3 lights (A, B, C) on the
 % object, where B is at the corner of the object, A is on the right to B
 
@@ -168,8 +168,10 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 objPosition(:,3) = 400;
 objPosition(:,4) = 400;
-objPosition(:,1) = 100;
-objPosition(:,2) = 500;
+objPosition(:,1) = 400;
+objPosition(:,2) = 350;
+objPosition(:,5) = 450;
+objPosition(:,6) = 400;
 %
 
 workingRelDVT = processedDVT;
@@ -187,22 +189,22 @@ for i = 1:size(workingRelDVT,1)
     end
 end
 
-indRecStruct.ObjVec.processedDVT = workingRelDVT;
+indRecStruct.objVec.processedDVT = workingRelDVT;
 
 clear vecAxy theta;
 
 %% Velocity & Acceleration - Averaged over adaptable window (updated with object-centered direction)
 % Initialize window size to use - can change here if desired.
-velSmoothWinSecs = 1/10; %Uses position change over X sec to calc vel.
+velSmoothWinSecs = 1/10; % Uses position change over X sec to calc vel.
 velSmoothWinSamples = round(sampleRate*velSmoothWinSecs);
 
 indRecStruct.velSmoothWinSecs = velSmoothWinSecs;
 
 % Output Variable Init
 vel = nan(length(processedDVT)-velSmoothWinSamples,2,nRealLights);
-acc = nan(length(vel)-1,2,nRealLights); %Compare point by point vel since they are already smoothed.
-instVel = nan(length(processedDVT)-1,2,nRealLights); % instantaneous (sample rate) velocity
-instAcc = nan(length(instVel)-1,2,nRealLights); %Compare point by point vel since they are already smoothed.
+acc = nan(length(vel)-1,2,nRealLights); % Compare point by point vel since they are already smoothed.
+instVel = nan(length(processedDVT)-1,2,nRealLights); % Instantaneous (sample rate) velocity
+instAcc = nan(length(instVel)-1,2,nRealLights); % Compare point by point vel since they are already smoothed.
 
 velRel = vel;
 accRel = acc;
@@ -255,10 +257,12 @@ indRecStruct.velInst = instVel;
 indRecStruct.accInst = instAcc;
 indRecStruct.velSmoothed = vel;
 indRecStruct.accSmoothed = acc;
-indRecStruct.ObjVec.velInst = instVelRel;
-indRecStruct.ObjVec.accInst = instAccRel;
-indRecStruct.ObjVec.velSmoothed = velRel;
-indRecStruct.ObjVec.accSmoothed = accRel;
+
+indRecStruct.objVec.objPosition = objPosition;
+indRecStruct.objVec.velInst = instVelRel;
+indRecStruct.objVec.accInst = instAccRel;
+indRecStruct.objVec.velSmoothed = velRel;
+indRecStruct.objVec.accSmoothed = accRel;
 
 clear bufferDistance iPos iLight light* xyDiff speed* 
 clear velMag velDirection accMag accDirection
@@ -277,7 +281,7 @@ indRecStruct.HDRadians = HDRadians;
 % Relative Head Direction
 
 HDRadiansRel = HDRadians + theta(1:length(HDRadians));
-indRecStruct.ObjVec.HDRadians = HDRadiansRel;
+indRecStruct.objVec.HDRadians = HDRadiansRel;
 
 % Output Check Code
 % [count,center] = hist(HDRadians,36);
@@ -286,9 +290,9 @@ indRecStruct.ObjVec.HDRadians = HDRadiansRel;
 clear posDiff light*
 
 %% Save results - indRecStruct
-save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
+%save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
 
-%end
+%% Notes
 
 % Make three lights on the object
 % Shift numbers to positive
