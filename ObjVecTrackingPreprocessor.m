@@ -167,31 +167,62 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 % Placeholder code for object position
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 objPosition(:,3) = 400;
-objPosition(:,4) = 400;
-objPosition(:,1) = 400;
-objPosition(:,2) = 350;
-objPosition(:,5) = 450;
-objPosition(:,6) = 400;
+objPosition(:,4) = 400; % columns 3, 4 are x, y positions for the light at the vertex of the object
+objPosition(:,1) = 420;
+objPosition(:,2) = 380; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
+objPosition(:,5) = 420;
+objPosition(:,6) = 420; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
 %
 
-workingRelDVT = processedDVT;
+workingDVTRel = processedDVT;
+objPositionRel = objPosition;
 
-for i = 1:size(workingRelDVT,2)/2-1
-    workingRelDVT(:,i*2+1:i*2+2) = workingRelDVT(:,i*2+1:i*2+2) - objPosition(:,3:4);
+for i = 1:size(workingDVTRel,2)/2-1
+    workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) - objPosition(:,3:4);
 end
 
-for i = 1:size(workingRelDVT,1)
+for i = 1:size(objPositionRel,2)/2
+    objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) - objPosition(:,3:4);
+end
+
+for i = 1:size(workingDVTRel,1)
     vecAxy = objPosition(i,1:2) - objPosition(i,3:4); % Vector A corresponding to object x-axis
     theta = -atan2(vecAxy(2),vecAxy(1)); % Object angle relative to room coordinates
     A = [cos(theta), -sin(theta); sin(theta), cos(theta)]; % Creates a rotation matrix
-    for j = 1:size(workingRelDVT,2)/2-1
-        workingRelDVT(i,j*2+1:j*2+2) = (A*workingRelDVT(i,j*2+1:j*2+2)')'; % Converting into object coordinates 
+    
+    for j = 1:size(workingDVTRel,2)/2-1
+        workingDVTRel(i,j*2+1:j*2+2) = (A*workingDVTRel(i,j*2+1:j*2+2)')'; % Converting into object-relative coordinates 
+    end
+    
+    for j = 1:size(objPositionRel,2)/2
+        objPositionRel(i,j*2-1:j*2) = (A*objPositionRel(i,j*2-1:j*2)')';
     end
 end
 
-indRecStruct.objVec.processedDVT = workingRelDVT;
+for i = 1:size(workingDVTRel,2)/2-1
+    workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) + objPosition(:,3:4);
+end
 
-clear vecAxy theta;
+for i = 1:size(objPositionRel,2)/2
+    objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) + objPosition(:,3:4);
+end
+
+indRecStruct.objPosition = objPosition;
+indRecStruct.objVec.processedDVT = workingDVTRel;
+indRecStruct.objVec.objPosition = objPositionRel;
+
+clear vecAxy theta workingDVTRel objPositionRel
+
+%% Calculate absolute distance to object (vertex)
+distance = zeros(size(processedDVT,1),4);
+distance(:,1:2) = processedDVT(:,1:2);
+distance(:,3) = sqrt((processedDVT(:,9)-objPosition(:,3)).^2 + (processedDVT(:,10)-objPosition(:,4)).^2);
+posVec = processedDVT(:,9:10)-objPosition(:,3:4);
+distance(:,4) = atan2(posVec(:,2), posVec(:,1));
+
+indRecStruct.distanceToObj = distance;
+
+clear distance posVec
 
 %% Velocity & Acceleration - Averaged over adaptable window (updated with object-centered direction)
 % Initialize window size to use - can change here if desired.
@@ -258,14 +289,13 @@ indRecStruct.accInst = instAcc;
 indRecStruct.velSmoothed = vel;
 indRecStruct.accSmoothed = acc;
 
-indRecStruct.objVec.objPosition = objPosition;
 indRecStruct.objVec.velInst = instVelRel;
 indRecStruct.objVec.accInst = instAccRel;
 indRecStruct.objVec.velSmoothed = velRel;
 indRecStruct.objVec.accSmoothed = accRel;
 
-clear bufferDistance iPos iLight light* xyDiff speed* 
-clear velMag velDirection accMag accDirection
+clear bufferDistance iPos iLight light* xyDiff speed*  velMag ...
+    velDirection accMag accDirection
 
 %% Head Direction
 light1 = processedDVT(:,3:4);
@@ -292,10 +322,35 @@ clear posDiff light*
 %% Save results - indRecStruct
 %save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
 
+%% Visualize tracking and object position data
+% prompt user input
+args = input('Plot object relative data (yes/no)?','s');
+
+% scatter run and object data
+if (args == "no") | (args == 'n') %#ok<OR2>
+    figure
+    hold on
+    
+    scatter(indRecStruct.processedDVT(:,9), indRecStruct.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+    scatter(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+    plot(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+    hold off
+elseif (args == "yes") | (args == 'y') %#ok<OR2>
+    figure
+    hold on
+    
+    scatter(indRecStruct.objVec.processedDVT(:,9), indRecStruct.objVec.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+    scatter(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+    plot(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+    hold off
+else
+    disp('Please answer yes/no')
+end
+
 %% Notes
 
-% Make three lights on the object
-% Shift numbers to positive
-% Calculate distance to three lights on the object
-% Draw positional vectors with angle at some interval
-% let the data tell you
+% Make three lights on the object -[x]
+% Shift numbers to positive -[x]
+% Calculate distance to object -[x]
+% Draw positional vectors with angle at some interval -[x]
+% let the data tell you -[x]
