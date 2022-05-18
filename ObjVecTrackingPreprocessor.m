@@ -191,7 +191,9 @@ for i = 1:size(workingDVTRel,1)
     A = [cos(theta), -sin(theta); sin(theta), cos(theta)]; % Creates a rotation matrix
     
     for j = 1:size(workingDVTRel,2)/2-1
-        workingDVTRel(i,j*2+1:j*2+2) = (A*workingDVTRel(i,j*2+1:j*2+2)')'; % Converting into object-relative coordinates 
+        if workingDVTRel(i,j*2+1) ~= 1 && workingDVTRel(i,j*2+1) ~= 1
+            workingDVTRel(i,j*2+1:j*2+2) = (A*workingDVTRel(i,j*2+1:j*2+2)')'; % Converting into object-relative coordinates 
+        end
     end
     
     for j = 1:size(objPositionRel,2)/2
