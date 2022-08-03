@@ -11,7 +11,7 @@
 %      inpaint_nans
 %
 % Written by Jingyue Xu, 202203317
-% Adopted from TTTrackingPreprocessor.m by Jake Olson, October 2014
+% Adapted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
 % Prompt user to select file. Will save back to the same folder.
 [dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
@@ -351,8 +351,30 @@ end
 
 %% Notes
 
-% Make three lights on the object -[x]
-% Shift numbers to positive -[x]
-% Calculate distance to object -[x]
-% Draw positional vectors with angle at some interval -[x]
-% let the data tell you -[x]
+% -[x] Make three lights on the object
+% -[x] Shift numbers to positive
+% -[x] Calculate distance to object
+% -[x] Draw positional vectors with angle at some interval
+% -[x] let the data tell you
+
+% # Events
+% ## Internal run
+% Hard code gate locations
+% Find stop events which correspond to getting the reward
+% Find the previous crossing in and the next crossing out to define internal run
+% 
+% ## External run
+% External run in between
+% Clean/dirty run
+% 
+% # Maps
+% ## Linearized rate map
+% 
+% ## Rate map mapped against distance
+% At particular distance and orientation, how many spikes occurred
+% 
+% ### Occupancy map
+% Matrix of zeros of the same size as the tracking, always centering at the object
+% 
+% ### Spike map
+% Based on occupancy map, how many spike occurred in a 1/60 s time window
