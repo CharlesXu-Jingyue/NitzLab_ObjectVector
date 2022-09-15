@@ -6,7 +6,6 @@
 %
 % This also includes velocity, acceleration, and head direction.
 %
-%
 % Non-built-in functions called:
 %      inpaint_nans
 %
@@ -50,6 +49,7 @@ samplesUnfilled = false(length(rawDVT),nRealLights);
 
 % Run for each light.
 for iLight = 1:nRealLights
+    
     %Indices of the light columns in the dvt matrix.
     lightColX = 1+iLight*2;
     lightColY = 2+iLight*2;
@@ -98,6 +98,7 @@ for iLight = 1:nRealLights
     % So we know where we fixed.
     samplesFilled(:,iLight) = samplesLost(:,iLight) & ...
         (workingDVT(:,lightColX) ~= 1 | workingDVT(:,lightColY) ~= 1);
+    
     % The gaps we couldn't fix.
     samplesUnfilled(:,iLight) = samplesLost(:,iLight) & ...
         (workingDVT(:,lightColX) == 1 & workingDVT(:,lightColY) == 1);
