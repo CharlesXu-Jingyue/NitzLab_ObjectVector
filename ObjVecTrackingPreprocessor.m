@@ -14,6 +14,7 @@
 
 % Prompt user to select file. Will save back to the same folder.
 [dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
+[csvFileName, csvPathName] = uigetfile('*.csv', 'Choose the marker file.');
 
 indRecStruct.dvtFileName = dvtFileName;
 indRecStruct.dvtPathName = dvtPathName;
@@ -23,6 +24,10 @@ indRecStruct.dvtPathName = dvtPathName;
 % Line Time Light1X Light1Y Light2X Light2Y ...
 rawDVT = load(fullfile(dvtPathName,dvtFileName));
 workingDVT = rawDVT;
+
+% Read object location markers from CSV file
+% rawMarker = readmatrix(fullfile(csvPathName,csvFileName),'FileType','text','OutputType','double');
+rawMarker = readtable(fullfile(csvPathName,csvFileName),'readvariablenames',false);
 
 % So we can use the tracked pixel values as indices later on in analyses,
 % we add one. To encode the location of the light in the DVT files, Plexon
@@ -159,6 +164,26 @@ indRecStruct.processedDVT = processedDVT;
 
 clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 
+%% Process object markers into object location data
+objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
+
+rawObjMarker = rawMarker(rawMarker.(1)=="Lego",:);
+for i = (1:size(rawObjMarker,1)/3)-1
+    tMarker = rawObjMarker{3*i+1,5};
+    objPosition1 = rawObjMarker{3*i+1,7:8};
+    objPosition2 = rawObjMarker{3*i+2,7:8};
+    objPosition3 = rawObjMarker{3*i+3,7:8};
+    iMarker = round(tMarker*60);
+    objPosition(iMarker:end,1) = objPosition1(1);
+    objPosition(iMarker:end,2) = objPosition1(2);
+    objPosition(iMarker:end,3) = objPosition2(1);
+    objPosition(iMarker:end,4) = objPosition2(2);
+    objPosition(iMarker:end,5) = objPosition3(1);
+    objPosition(iMarker:end,6) = objPosition3(2);
+end
+
+clear tMarker objPosition1 objPosition2 objPosition3 iMarker
+
 %% Create relative DVT for object-centered position
 % Edit objPosition to adapt the code to actual data
 % Apply a transformation matrix to rotate DVT to object-relative position
@@ -166,13 +191,13 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 % object, where B is at the corner of the object, A is on the right to B
 
 % Placeholder code for object position
-objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
-objPosition(:,3) = 400;
-objPosition(:,4) = 400; % columns 3, 4 are x, y positions for the light at the vertex of the object
-objPosition(:,1) = 420;
-objPosition(:,2) = 380; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
-objPosition(:,5) = 420;
-objPosition(:,6) = 420; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
+% objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
+% objPosition(:,3) = 400;
+% objPosition(:,4) = 400; % columns 3, 4 are x, y positions for the light at the vertex of the object
+% objPosition(:,1) = 420;
+% objPosition(:,2) = 380; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
+% objPosition(:,5) = 420;
+% objPosition(:,6) = 420; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
 %
 
 workingDVTRel = processedDVT;
@@ -323,32 +348,32 @@ indRecStruct.objVec.HDRadians = HDRadiansRel;
 clear posDiff light*
 
 %% Save results - indRecStruct
-%save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
+% save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
 
 %% Visualize tracking and object position data
-% prompt user input
-args = input('Plot object relative data (yes/no)?','s');
-
-% scatter run and object data
-if (args == "no") | (args == 'n') %#ok<OR2>
-    figure
-    hold on
-    
-    scatter(indRecStruct.processedDVT(:,9), indRecStruct.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-    scatter(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-    plot(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
-    hold off
-elseif (args == "yes") | (args == 'y') %#ok<OR2>
-    figure
-    hold on
-    
-    scatter(indRecStruct.objVec.processedDVT(:,9), indRecStruct.objVec.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-    scatter(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-    plot(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
-    hold off
-else
-    disp('Please answer yes/no')
-end
+% % prompt user input
+% args = input('Plot object relative data (yes/no)?','s');
+% 
+% % scatter run and object data
+% if (args == "no") | (args == 'n') %#ok<OR2>
+%     figure
+%     hold on
+%     
+%     scatter(indRecStruct.processedDVT(:,9), indRecStruct.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+%     scatter(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+%     plot(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+%     hold off
+% elseif (args == "yes") | (args == 'y') %#ok<OR2>
+%     figure
+%     hold on
+%     
+%     scatter(indRecStruct.objVec.processedDVT(:,9), indRecStruct.objVec.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+%     scatter(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+%     plot(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+%     hold off
+% else
+%     disp('Please answer yes/no')
+% end
 
 %% Notes
 
