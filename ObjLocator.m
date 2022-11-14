@@ -1,20 +1,21 @@
-[csvFileName, csvPathName] = uigetfile('*.csv', 'Choose the marker file.');
-rawMarker = readtable(fullfile(csvPathName,csvFileName),'readvariablenames',false);
+%% Object locator
+% Charles Xu @ UCSD, v1, 20221112
+% Process scored csv file to get object location and events
 
-a = readmatrix(fullfile(csvPathName,csvFileName),'FileType','text','OutputType','double');
+%% Import scored csv file
 
-rawMarker(:,1)
-size(rawMarker,1)
+[objFileName, objPathName] = uigetfile('*.csv', 'Choose the object marker file.');
+[evtFileName, evtPathName] = uigetfile('*.csv', 'Choose the event marker file.');
 
-for i = 1:size(rawMarker,1)
-    if rawMarker(:,1) == "Lego"
-        
-    end
+objRaw = readtable(fullfile(objPathName,objFileName),'readvariablenames',false);
+evtRaw = readtable(fullfile(evtPathName,evtFileName),'readvariablenames',false);
+
+%% Save results - objVecMarkers
+
+objVecMarkers.objPosition = objPosition;
+objVecMarkers.
+
+args = input('Save data? yes/no (y/n)','s');
+if (args == "yes") | (args == 'y') %#ok<OR2>
+    save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
 end
-
-a = 'Lego';
-class(a)
-
-rem(10, 4)
-
-rawMarker(rawMarker.(1)=="Lego",:)

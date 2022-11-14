@@ -12,10 +12,12 @@
 % Written by Jingyue Xu, 202203317
 % Adapted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
+clear
+
 % Prompt user to select file. Will save back to the same folder.
 [dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
-[csvFileName, csvPathName] = uigetfile('*.csv', 'Choose the marker file.');
-
+[objFileName, objPathName] = uigetfile('*.csv', 'Choose the object marker file.');
+[evtFileName, evtPathName] = uigetfile('*.csv', 'Choose the event marker file.');
 indRecStruct.dvtFileName = dvtFileName;
 indRecStruct.dvtPathName = dvtPathName;
 
@@ -25,9 +27,9 @@ indRecStruct.dvtPathName = dvtPathName;
 rawDVT = load(fullfile(dvtPathName,dvtFileName));
 workingDVT = rawDVT;
 
-% Read object location markers from CSV file
-% rawMarker = readmatrix(fullfile(csvPathName,csvFileName),'FileType','text','OutputType','double');
-rawMarker = readtable(fullfile(csvPathName,csvFileName),'readvariablenames',false);
+% Read object location and event markers from CSV file
+objRaw = readtable(fullfile(objPathName,objFileName),'readvariablenames',false);
+evtRaw = readtable(fullfile(evtPathName,evtFileName),'readvariablenames',false);
 
 % So we can use the tracked pixel values as indices later on in analyses,
 % we add one. To encode the location of the light in the DVT files, Plexon
@@ -36,6 +38,8 @@ rawMarker = readtable(fullfile(csvPathName,csvFileName),'readvariablenames',fals
 % 640x480, then adds 1 to the value so values are 1-640 instead of 0-639.
 workingDVT(:,3:end) = workingDVT(:,3:end)*639/1023 +1;
 nRealLights = (size(rawDVT,2)/2)-1;
+
+clear objFileName objPathName evtFileName evtPathName
 
 %% Filling in missing position points.
 % For this work, Doug is willing to fill in gaps of up to 1/2 second.
@@ -164,41 +168,37 @@ indRecStruct.processedDVT = processedDVT;
 
 clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 
+%% Process event markers
+inner = table2array(evtRaw(evtRaw.(1)=="inner",5:6));
+
+indRecStruct.event.inner = inner;
+
 %% Process object markers into object location data
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 
-rawObjMarker = rawMarker(rawMarker.(1)=="Lego",:);
+rawObjMarker = objRaw(objRaw.(1)=="lego",:);
 for i = (1:size(rawObjMarker,1)/3)-1
     tMarker = rawObjMarker{3*i+1,5};
     objPosition1 = rawObjMarker{3*i+1,7:8};
     objPosition2 = rawObjMarker{3*i+2,7:8};
     objPosition3 = rawObjMarker{3*i+3,7:8};
     iMarker = round(tMarker*60);
-    objPosition(iMarker:end,1) = objPosition1(1);
+    objPosition(iMarker:end,1) = objPosition1(1); % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
     objPosition(iMarker:end,2) = objPosition1(2);
-    objPosition(iMarker:end,3) = objPosition2(1);
+    objPosition(iMarker:end,3) = objPosition2(1); % columns 3, 4 are x, y positions for the light at the vertex of the object
     objPosition(iMarker:end,4) = objPosition2(2);
-    objPosition(iMarker:end,5) = objPosition3(1);
+    objPosition(iMarker:end,5) = objPosition3(1); % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
     objPosition(iMarker:end,6) = objPosition3(2);
 end
+
+indRecStruct.objPosition = objPosition;
 
 clear tMarker objPosition1 objPosition2 objPosition3 iMarker
 
 %% Create relative DVT for object-centered position
-% Edit objPosition to adapt the code to actual data
 % Apply a transformation matrix to rotate DVT to object-relative position
 % This code block is written assuming there are 3 lights (A, B, C) on the
 % object, where B is at the corner of the object, A is on the right to B
-
-% Placeholder code for object position
-% objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
-% objPosition(:,3) = 400;
-% objPosition(:,4) = 400; % columns 3, 4 are x, y positions for the light at the vertex of the object
-% objPosition(:,1) = 420;
-% objPosition(:,2) = 380; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
-% objPosition(:,5) = 420;
-% objPosition(:,6) = 420; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
-%
 
 workingDVTRel = processedDVT;
 objPositionRel = objPosition;
@@ -214,11 +214,11 @@ end
 for i = 1:size(workingDVTRel,1)
     vecAxy = objPosition(i,1:2) - objPosition(i,3:4); % Vector A corresponding to object x-axis
     theta = -atan2(vecAxy(2),vecAxy(1)); % Object angle relative to room coordinates
-    A = [cos(theta), -sin(theta); sin(theta), cos(theta)]; % Creates a rotation matrix
+    A = [cos(theta), -sin(theta); sin(theta), cos(theta)]; % Create a rotation matrix
     
     for j = 1:size(workingDVTRel,2)/2-1
         if workingDVTRel(i,j*2+1) ~= 1 && workingDVTRel(i,j*2+1) ~= 1
-            workingDVTRel(i,j*2+1:j*2+2) = (A*workingDVTRel(i,j*2+1:j*2+2)')'; % Converting into object-relative coordinates 
+            workingDVTRel(i,j*2+1:j*2+2) = (A*workingDVTRel(i,j*2+1:j*2+2)')'; % Convert into object-relative coordinates 
         end
     end
     
@@ -235,11 +235,10 @@ for i = 1:size(objPositionRel,2)/2
     objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) + objPosition(:,3:4);
 end
 
-indRecStruct.objPosition = objPosition;
 indRecStruct.objVec.processedDVT = workingDVTRel;
 indRecStruct.objVec.objPosition = objPositionRel;
 
-clear vecAxy theta workingDVTRel objPositionRel
+clear vecAxy theta
 
 %% Calculate absolute distance to object (vertex)
 distance = zeros(size(processedDVT,1),4);
@@ -250,7 +249,7 @@ distance(:,4) = atan2(posVec(:,2), posVec(:,1));
 
 indRecStruct.distanceToObj = distance;
 
-clear distance posVec
+clear posVec
 
 %% Velocity & Acceleration - Averaged over adaptable window (updated with object-centered direction)
 % Initialize window size to use - can change here if desired.
@@ -337,7 +336,6 @@ HDRadians((samplesLost(:,1) & ~samplesFilled(:,1)) | ...
 indRecStruct.HDRadians = HDRadians;
 
 % Relative Head Direction
-
 HDRadiansRel = HDRadians + theta(1:length(HDRadians));
 indRecStruct.objVec.HDRadians = HDRadiansRel;
 
@@ -345,10 +343,13 @@ indRecStruct.objVec.HDRadians = HDRadiansRel;
 % [count,center] = hist(HDRadians,36);
 % sortedRows = sortrows([count;center]',1);
 
-clear posDiff light*
+clear posDiff light* vecAxy theta
 
 %% Save results - indRecStruct
-% save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_RecStruct_ProcessedDVT_ObjVec')), 'indRecStruct');
+args = input('Save data? yes/no (y/n)','s');
+if (args == "yes") | (args == 'y') %#ok<OR2>
+    save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_indRecStruct_objVec')), 'indRecStruct');
+end
 
 %% Visualize tracking and object position data
 % % prompt user input
