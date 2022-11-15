@@ -227,13 +227,13 @@ for i = 1:size(workingDVTRel,1)
     end
 end
 
-for i = 1:size(workingDVTRel,2)/2-1
-    workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) + objPosition(:,3:4);
-end
-
-for i = 1:size(objPositionRel,2)/2
-    objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) + objPosition(:,3:4);
-end
+% for i = 1:size(workingDVTRel,2)/2-1
+%     workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) + objPosition(:,3:4);
+% end
+% 
+% for i = 1:size(objPositionRel,2)/2
+%     objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) + objPosition(:,3:4);
+% end
 
 indRecStruct.objVec.processedDVT = workingDVTRel;
 indRecStruct.objVec.objPosition = objPositionRel;
