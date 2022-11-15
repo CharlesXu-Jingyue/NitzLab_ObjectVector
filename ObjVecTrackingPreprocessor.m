@@ -396,12 +396,16 @@ end
 % 
 % # Maps
 % ## Linearized rate map
+% Need neuron data (20221114)
 % 
-% ## Rate map mapped against distance
+% ## Rate map mapped against distance (need neuron data)
 % At particular distance and orientation, how many spikes occurred
+% Need neuron data (20221114)
 % 
 % ### Occupancy map
 % Matrix of zeros of the same size as the tracking, always centering at the object
+% Update to get map for each inner run (20221114)
 % 
 % ### Spike map
 % Based on occupancy map, how many spike occurred in a 1/60 s time window
+% Need neuron data (20221114)
