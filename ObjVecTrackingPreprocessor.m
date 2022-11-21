@@ -9,7 +9,7 @@
 % Non-built-in functions called:
 %      inpaint_nans
 %
-% Written by Jingyue Xu, 202203317
+% By Jingyue Xu, 202203317
 % Adapted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
 clear
@@ -191,6 +191,7 @@ for i = (1:size(rawObjMarker,1)/3)-1
     objPosition(iMarker:end,6) = objPosition3(2);
 end
 
+objPosition = [processedDVT(:,1:2) objPosition];
 indRecStruct.objPosition = objPosition;
 
 clear tMarker objPosition1 objPosition2 objPosition3 iMarker
@@ -201,7 +202,7 @@ clear tMarker objPosition1 objPosition2 objPosition3 iMarker
 % object, where B is at the corner of the object, A is on the right to B
 
 workingDVTRel = processedDVT;
-objPositionRel = objPosition;
+objPositionRel = objPosition(:,3:end);
 
 for i = 1:size(workingDVTRel,2)/2-1
     workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) - objPosition(:,3:4);
@@ -235,6 +236,7 @@ end
 %     objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) + objPosition(:,3:4);
 % end
 
+objPositionRel = [processedDVT(:,1:2) objPositionRel];
 indRecStruct.objVec.processedDVT = workingDVTRel;
 indRecStruct.objVec.objPosition = objPositionRel;
 
@@ -400,7 +402,7 @@ end
 % 
 % ## Rate map mapped against distance (need neuron data)
 % At particular distance and orientation, how many spikes occurred
-% Need neuron data (20221114)
+% Need neuron datva (20221114)
 % 
 % ### Occupancy map
 % Matrix of zeros of the same size as the tracking, always centering at the object
