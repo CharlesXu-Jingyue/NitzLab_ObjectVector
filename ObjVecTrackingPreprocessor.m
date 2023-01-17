@@ -1,4 +1,4 @@
-%% ObjVecTrackingPreprocessor - 2D Tracking PostProcessing
+%% ObjVecTrackingPreprocessor
 % ObjVecTrackingPreprocessor takes in a dvt file and writes a .mat file with a
 % name starting with the name of the dvt file. The .mat file has
 % interpolated light data up to acceptable gap sizes as well as an
@@ -17,7 +17,6 @@ clear
 % Prompt user to select file. Will save back to the same folder.
 [dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
 [objFileName, objPathName] = uigetfile('*.csv', 'Choose the object marker file.');
-[evtFileName, evtPathName] = uigetfile('*.csv', 'Choose the event marker file.');
 indRecStruct.dvtFileName = dvtFileName;
 indRecStruct.dvtPathName = dvtPathName;
 
@@ -27,9 +26,8 @@ indRecStruct.dvtPathName = dvtPathName;
 rawDVT = load(fullfile(dvtPathName,dvtFileName));
 workingDVT = rawDVT;
 
-% Read object location and event markers from CSV file
+% Read object location markers from CSV file
 objRaw = readtable(fullfile(objPathName,objFileName),'readvariablenames',false);
-evtRaw = readtable(fullfile(evtPathName,evtFileName),'readvariablenames',false);
 
 % So we can use the tracked pixel values as indices later on in analyses,
 % we add one. To encode the location of the light in the DVT files, Plexon
@@ -39,7 +37,7 @@ evtRaw = readtable(fullfile(evtPathName,evtFileName),'readvariablenames',false);
 workingDVT(:,3:end) = workingDVT(:,3:end)*639/1023 +1;
 nRealLights = (size(rawDVT,2)/2)-1;
 
-clear objFileName objPathName evtFileName evtPathName
+clear objFileName objPathName
 
 %% Filling in missing position points.
 % For this work, Doug is willing to fill in gaps of up to 1/2 second.
@@ -164,14 +162,9 @@ end
 
 % DVT processing - (interpolating and adding an average light) is finished.
 processedDVT = workingDVT;
-indRecStruct.processedDVT = processedDVT;
+indRecStruct.world.processedDVT = processedDVT;
 
 clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
-
-%% Process event markers
-inner = table2array(evtRaw(evtRaw.(1)=="inner",5:6));
-
-indRecStruct.event.inner = inner;
 
 %% Process object markers into object location data
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
@@ -192,7 +185,7 @@ for i = (1:size(rawObjMarker,1)/3)-1
 end
 
 objPosition = [processedDVT(:,1:2) objPosition];
-indRecStruct.objPosition = objPosition;
+indRecStruct.world.objPosition = objPosition;
 
 clear tMarker objPosition1 objPosition2 objPosition3 iMarker
 
@@ -205,15 +198,15 @@ workingDVTRel = processedDVT;
 objPositionRel = objPosition(:,3:end);
 
 for i = 1:size(workingDVTRel,2)/2-1
-    workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) - objPosition(:,3:4);
+    workingDVTRel(:,i*2+1:i*2+2) = workingDVTRel(:,i*2+1:i*2+2) - objPosition(:,5:6);
 end
 
 for i = 1:size(objPositionRel,2)/2
-    objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) - objPosition(:,3:4);
+    objPositionRel(:,i*2-1:i*2) = objPositionRel(:,i*2-1:i*2) - objPosition(:,5:6);
 end
 
 for i = 1:size(workingDVTRel,1)
-    vecAxy = objPosition(i,1:2) - objPosition(i,3:4); % Vector A corresponding to object x-axis
+    vecAxy = objPositionRel(i,1:2) - objPositionRel(i,3:4); % Vector A corresponding to object x-axis
     theta = -atan2(vecAxy(2),vecAxy(1)); % Object angle relative to room coordinates
     A = [cos(theta), -sin(theta); sin(theta), cos(theta)]; % Create a rotation matrix
     
@@ -237,8 +230,8 @@ end
 % end
 
 objPositionRel = [processedDVT(:,1:2) objPositionRel];
-indRecStruct.objVec.processedDVT = workingDVTRel;
-indRecStruct.objVec.objPosition = objPositionRel;
+indRecStruct.object.processedDVT = workingDVTRel;
+indRecStruct.object.objPosition = objPositionRel;
 
 clear vecAxy theta
 
@@ -249,7 +242,7 @@ distance(:,3) = sqrt((processedDVT(:,9)-objPosition(:,3)).^2 + (processedDVT(:,1
 posVec = processedDVT(:,9:10)-objPosition(:,3:4);
 distance(:,4) = atan2(posVec(:,2), posVec(:,1));
 
-indRecStruct.distanceToObj = distance;
+indRecStruct.world.distanceToObj = distance;
 
 clear posVec
 
@@ -257,8 +250,6 @@ clear posVec
 % Initialize window size to use - can change here if desired.
 velSmoothWinSecs = 1/10; % Uses position change over X sec to calc vel.
 velSmoothWinSamples = round(sampleRate*velSmoothWinSecs);
-
-indRecStruct.velSmoothWinSecs = velSmoothWinSecs;
 
 % Output Variable Init
 vel = nan(length(processedDVT)-velSmoothWinSamples,2,nRealLights);
@@ -313,15 +304,15 @@ for iLight = 1:nRealLights
     instAccRel(:,:,iLight) = [instAccMag,instAccDirectionRel];
 end
 
-indRecStruct.velInst = instVel;
-indRecStruct.accInst = instAcc;
-indRecStruct.velSmoothed = vel;
-indRecStruct.accSmoothed = acc;
+indRecStruct.world.velInst = instVel;
+indRecStruct.world.accInst = instAcc;
+indRecStruct.world.velSmoothed = vel;
+indRecStruct.world.accSmoothed = acc;
 
-indRecStruct.objVec.velInst = instVelRel;
-indRecStruct.objVec.accInst = instAccRel;
-indRecStruct.objVec.velSmoothed = velRel;
-indRecStruct.objVec.accSmoothed = accRel;
+indRecStruct.object.velInst = instVelRel;
+indRecStruct.object.accInst = instAccRel;
+indRecStruct.object.velSmoothed = velRel;
+indRecStruct.object.accSmoothed = accRel;
 
 clear bufferDistance iPos iLight light* xyDiff speed*  velMag ...
     velDirection accMag accDirection
@@ -335,11 +326,11 @@ HDRadians = atan2(posDiff(:,2),posDiff(:,1));
 HDRadians((samplesLost(:,1) & ~samplesFilled(:,1)) | ...
     (samplesLost(:,2) & ~samplesFilled(:,2))) = NaN;
 
-indRecStruct.HDRadians = HDRadians;
+indRecStruct.world.HDRadians = HDRadians;
 
 % Relative Head Direction
 HDRadiansRel = HDRadians + theta(1:length(HDRadians));
-indRecStruct.objVec.HDRadians = HDRadiansRel;
+indRecStruct.object.HDRadians = HDRadiansRel;
 
 % Output Check Code
 % [count,center] = hist(HDRadians,36);
@@ -362,17 +353,17 @@ end
 %     figure
 %     hold on
 %     
-%     scatter(indRecStruct.processedDVT(:,9), indRecStruct.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-%     scatter(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-%     plot(indRecStruct.objPosition(1,[1,3,5]), indRecStruct.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+%     scatter(indRecStruct.world.processedDVT(:,9), indRecStruct.world.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+%     scatter(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+%     plot(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
 %     hold off
 % elseif (args == "yes") | (args == 'y') %#ok<OR2>
 %     figure
 %     hold on
 %     
-%     scatter(indRecStruct.objVec.processedDVT(:,9), indRecStruct.objVec.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-%     scatter(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-%     plot(indRecStruct.objVec.objPosition(1,[1,3,5]), indRecStruct.objVec.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+%     scatter(indRecStruct.object.processedDVT(:,9), indRecStruct.object.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+%     scatter(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+%     plot(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
 %     hold off
 % else
 %     disp('Please answer yes/no')
