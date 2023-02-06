@@ -176,12 +176,12 @@ for i = (1:size(rawObjMarker,1)/3)-1
     objPosition2 = rawObjMarker{3*i+2,7:8};
     objPosition3 = rawObjMarker{3*i+3,7:8};
     iMarker = round(tMarker*60);
-    objPosition(iMarker:end,1) = objPosition1(1); % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
-    objPosition(iMarker:end,2) = objPosition1(2);
-    objPosition(iMarker:end,3) = objPosition2(1); % columns 3, 4 are x, y positions for the light at the vertex of the object
-    objPosition(iMarker:end,4) = objPosition2(2);
-    objPosition(iMarker:end,5) = objPosition3(1); % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
-    objPosition(iMarker:end,6) = objPosition3(2);
+    objPosition(iMarker:end,1) = objPosition1(1)*640/1024; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
+    objPosition(iMarker:end,2) = objPosition1(2)*480/768;
+    objPosition(iMarker:end,3) = objPosition2(1)*640/1024; % columns 3, 4 are x, y positions for the light at the vertex of the object
+    objPosition(iMarker:end,4) = objPosition2(2)*480/768;
+    objPosition(iMarker:end,5) = objPosition3(1)*640/1024; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
+    objPosition(iMarker:end,6) = objPosition3(2)*480/768;
 end
 
 objPosition = [processedDVT(:,1:2) objPosition];
