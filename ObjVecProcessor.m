@@ -17,24 +17,26 @@
 clear
 
 % Prompt user to select file. Will save back to the same folder.
-[dvtFileName, dvtPathName] = uigetfile('*.dvt', 'Choose the dvt file.');
-[objFileName, objPathName] = uigetfile('*lego.csv', 'Choose the object marker file.');
-[inrFileName, inrPathName] = uigetfile('*inner.csv', 'Choose the inner marker file.');
-[spkFileName, spkPathName] = uigetfile('*.mat', 'Choose the spike data file.');
+recDir = uigetdir;
+cd(recDir)
+[dvtFileName, dvtPathName] = uigetfile(fullfile(recDir, '*.dvt'), 'Choose the dvt file.');
+[objFileName, objPathName] = uigetfile(fullfile(recDir, '*lego.csv'), 'Choose the object marker file.');
+[inrFileName, inrPathName] = uigetfile(fullfile(recDir, '*inner.csv'), 'Choose the inner marker file.');
+[spkFileName, spkPathName] = uigetfile(fullfile(recDir, '*.mat'), 'Choose the spike data file.');
 indRecStruct.dvtFileName = dvtFileName;
 indRecStruct.dvtPathName = dvtPathName;
 
 % Raw DVT file should be of the format of each row being a sample, with
 % multiple columns. The columns are:
 % Line Time Light1X Light1Y Light2X Light2Y ...
-rawDVT = load(fullfile(dvtPathName, dvtFileName));
-workingDVT = rawDVT;
+dvtRaw = load(fullfile(dvtPathName, dvtFileName));
+workingDVT = dvtRaw;
 
 % Read object location markers from CSV file
-objRaw = readtable(fullfile(objPathName, objFileName), 'readvariablenames', false);
+objRaw = readtable(fullfile(objPathName, objFileName));
 
 % Read inner run event markers from CSV file
-inrRaw = readtable(fullfile(inrPathName, inrFileName), 'readvariablenames', false);
+inrRaw = readtable(fullfile(inrPathName, inrFileName));
 
 % Read spike time data MAT file
 spkRaw = load(fullfile(spkPathName, spkFileName));
@@ -45,9 +47,9 @@ spkRaw = load(fullfile(spkPathName, spkFileName));
 % This converts from the encoding form 1024x1024 to native pixels of camera
 % 640x480, then adds 1 to the value so values are 1-640 instead of 0-639.
 workingDVT(:, 3:end) = workingDVT(:, 3:end)*639/1023+1;
-nRealLights = (size(rawDVT, 2)/2)-1;
+nRealLights = (size(dvtRaw, 2)/2)-1;
 
-clear objFileName objPathName
+clear objFileName objPathName inrFileName inrPathName spkFileName spkPathName
 
 %% Filling in missing position points.
 % For this work, Doug is willing to fill in gaps of up to 1/2 second.
@@ -60,9 +62,9 @@ indRecStruct.trackingSampleRate = sampleRate;
 indRecStruct.maxGapFilled = maxGap;
 
 % Var Init
-samplesLost = false(length(rawDVT), nRealLights);
-samplesFilled = false(length(rawDVT), nRealLights);
-samplesUnfilled = false(length(rawDVT), nRealLights);
+samplesLost = false(length(dvtRaw), nRealLights);
+samplesFilled = false(length(dvtRaw), nRealLights);
+samplesUnfilled = false(length(dvtRaw), nRealLights);
 
 % Run for each light.
 for iLight = 1:nRealLights
@@ -179,7 +181,7 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 %% Process object markers into object location data
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 
-rawObjMarker = objRaw(objRaw.(1)=="lego",:);
+rawObjMarker = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
 for i = (1:size(rawObjMarker,1)/3)-1
     tMarker = rawObjMarker{3*i+1,5};
     objPosition1 = rawObjMarker{3*i+1,7:8};
@@ -349,7 +351,7 @@ indRecStruct.object.HDRadians = HDRadiansRel;
 clear posDiff light* vecAxy theta
 
 %% Process inner run event markers
-inner = table2array(inrRaw(inrRaw.(1)=="inner",5:6));
+inner = table2array(inrRaw(inrRaw.(1) == "inner" | inrRaw.(1) == "Inner", 5:6));
 outer = zeros(length(inner)-1, 2);
 outer(:,1) = inner(1:end-1, 2);
 outer(:,2) = inner(2:end, 1);
@@ -360,7 +362,7 @@ indRecStruct.event.outer = outer;
 clear inner outer
 
 %% Process spike time data
-
+indRecStruct.spike = spkRaw;
 
 %% Save results - indRecStruct
 args = input('Save data? yes/no (y/n)','s');
@@ -371,24 +373,22 @@ end
 %% Visualize tracking and object position data
 args = input('Plot data? yes/no (y/n)','s');
 if (args == "yes") | (args == 'y') %#ok<OR2>
+    figure
+    hold on
+    scatter(indRecStruct.world.processedDVT(:,9), indRecStruct.world.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
+    scatter(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
+    plot(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+    hold off
+    
     args = input('Plot object relative data? yes/no (y/n)','s');
     % scatter run and object data
-    if (args == "no") | (args == 'n') %#ok<OR2>
-        figure
-        hold on
-        scatter(indRecStruct.world.processedDVT(:,9), indRecStruct.world.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-        scatter(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-        plot(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
-        hold off
-    elseif (args == "yes") | (args == 'y') %#ok<OR2>
+    if (args == "yes") | (args == 'y') %#ok<OR2>
         figure
         hold on
         scatter(indRecStruct.object.processedDVT(:,9), indRecStruct.object.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
         scatter(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
         plot(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
         hold off
-    else
-        disp('Please answer yes/no')
     end
 end
 

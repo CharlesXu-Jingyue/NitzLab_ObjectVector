@@ -1,0 +1,20 @@
+clear
+
+[matFileName, matPathName] = uigetfile('*indRecStruct*.mat', 'Choose the mat file.');
+fieldNames = string(fieldnames(indRecStruct.spike));
+fieldCell = struct2cell(indRecStruct.spike);
+isSignalCell = strfind(fieldNames, "sig");
+isSignalCell(cellfun(@isempty, isSignalCell)) = {0};
+isSignal = logical([isSignalCell{:}]);
+signalNames = fieldNames(isSignal);
+variableCell = fieldCell(isSignal);
+
+fid = fopen('tfile_list.txt', 'w+');
+for i = 1:length(signalNames)
+    filename = signalNames(i,1);
+    cell
+    codethis = ['save ' sprintf(char(filename)) ' variableCell{' num2str(i) '} -ascii'];
+    eval(codethis);
+    fprintf(fid, '%s\n',char(filename));
+end
+fclose(fid);
