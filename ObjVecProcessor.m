@@ -425,3 +425,7 @@ end
 % ### Spike map
 % Based on occupancy map, how many spike occurred in a 1/60 s time window
 % Need neuron data (20221114)
+
+
+% Deal with cell phone
+% Count unfixable gaps
