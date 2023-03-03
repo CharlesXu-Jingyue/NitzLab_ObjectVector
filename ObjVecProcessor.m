@@ -367,28 +367,35 @@ indRecStruct.spike = spkRaw;
 %% Save results - indRecStruct
 args = input('Save data? yes/no (y/n)','s');
 if (args == "yes") | (args == 'y') %#ok<OR2>
-    save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_indRecStruct_objVec')), 'indRecStruct');
+    save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_indRecStruct')), 'indRecStruct');
 end
 
+clear args
 %% Visualize tracking and object position data
 args = input('Plot data? yes/no (y/n)','s');
 if (args == "yes") | (args == 'y') %#ok<OR2>
     figure
     hold on
     scatter(indRecStruct.world.processedDVT(:,9), indRecStruct.world.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-    scatter(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-    plot(indRecStruct.world.objPosition(1,[1,3,5]), indRecStruct.world.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+    scatter(indRecStruct.world.objPosition(:,[3,5,7]), indRecStruct.world.objPosition(:,[4,6,8]), 200, '.', 'MarkerEdgeColor', '#D95319')
+    xlim([0 660])
+    ylim([0 500])
     hold off
     
+    saveas(gcf, string(recDir) + filesep + "ProcessedDVT.png")
+    
     args = input('Plot object relative data? yes/no (y/n)','s');
-    % scatter run and object data
+    % Scatter run and object data
     if (args == "yes") | (args == 'y') %#ok<OR2>
         figure
         hold on
         scatter(indRecStruct.object.processedDVT(:,9), indRecStruct.object.processedDVT(:,10), '.', 'MarkerEdgeColor', [0 0.4470 0.7410])
-        scatter(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 200, '.', 'MarkerEdgeColor', '#D95319')
-        plot(indRecStruct.object.objPosition(1,[1,3,5]), indRecStruct.object.objPosition(1,[2,4,6]), 'LineWidth', 1, 'Color', '#D95319')
+        scatter(indRecStruct.object.objPosition(:,[3,5,7]), indRecStruct.object.objPosition(:,[4,6,8]), 200, '.', 'MarkerEdgeColor', '#D95319')
+        xlim([-660 660])
+        ylim([-500 500])        
         hold off
+        
+        saveas(gcf, string(recDir) + filesep + "ProcessedDVT_ObjVec.png")
     end
 end
 
