@@ -1,200 +1,75 @@
-function ObjVecRunViewer()
+%% ObjVecRunViewer
+% ObjVecRunViewer reads in the indRecStruct dataset and plots single runs
+% 
+% By Jingyue Xu, 202203317
 
-% Load the processedDVT to track the run at a certain time window
+clear
+close all
 
-%%  Initialize GUI creation variables
+% Prompt user to select file
+recDir = uigetdir;
+cd(recDir)
+[matFileName, matPathName] = uigetfile(fullfile(recDir, '*indRecStruct.mat'), 'Choose the mat file.');
+load(fullfile(matPathName, matFileName))
 
-xAxisRange = 640;
-yAxisRange = 480;
-buttonWidth = 80;
-buttonPadding = 10;
-buttonHeight = 25;
-overallWindowXSize = 900;
-overallWindowYSize = 750;
-axesXLoc = 50;
-axesYLoc = 200;
-buttonRow1Height = 100;
-buttonRow2Height = buttonPadding;
-buttonColumnXLoc = 715; %Equal padding both sides.
-buttonColumnYLoc = axesYLoc;
-sliderWidth = 640;
+% Prompt user to specify run
+%args = input("This recording has " + indRecStruct.event.runNumber + " runs, which run to plot?");
+%
+%iRun = args;
+iRun = 15;
+runIndex = indRecStruct.event.inner(iRun,2:3);
 
-%Use the color generator thing for this.
-pen = repmat(distinguishable_colors(10,[0,0,0;1,1,1]),2,1);
+dvtWorld = indRecStruct.world.processedDVT(runIndex(1):runIndex(2),9:10);
+dvtObject = indRecStruct.object.processedDVT(runIndex(1):runIndex(2),9:10);
+objPosWorld = indRecStruct.world.objPosition(runIndex(1),3:end);
+objPosObject = indRecStruct.object.objPosition(runIndex(1),3:end);
 
-%  Create and then hide the GUI as it is being constructed.
-overallWindow = figure('Visible','off','Position',...
-    [100,100,overallWindowXSize,overallWindowYSize]);
+HDRWorld = indRecStruct.world.HDRadians(runIndex(1):runIndex(2),1);
+HDRObject = indRecStruct.object.HDRadians(runIndex(1):runIndex(2),1);
 
-%  Construct the components
-hAbort = uicontrol('Style','pushbutton','Callback',@abort_Callback,...
-    'String','Reset the GUI!','BackgroundColor','red','Position',...
-    [buttonColumnXLoc,buttonColumnYLoc+13*(buttonHeight+buttonPadding),buttonWidth*2,buttonHeight]);
+distWorld = indRecStruct.world.objVec(runIndex(1):runIndex(2),4);
+distObject = indRecStruct.object.objVec(runIndex(1):runIndex(2),4);
 
-hTimeSlider = uicontrol('Style', 'slider','Min',0,'Max',1,'Value',0,...
-    'Position',[axesXLoc,buttonRow2Height,sliderWidth,buttonHeight],...
-    'Callback',@timeSlider_Callback);
-hWindowTimeSizeLabel = uicontrol('Style','text','String','Time Window Size To Display',...
-    'Position',[buttonColumnXLoc,buttonRow2Height+buttonHeight,2*buttonWidth,buttonHeight/2]);
-hWindowTimeSize = uicontrol('Style','edit','String',1000,...
-    'Position',[buttonColumnXLoc,buttonRow2Height,2*buttonWidth,buttonHeight],...
-    'Callback',@windowTimeSize_Callback);
+c = linspace(runIndex(1), runIndex(2), runIndex(2)-runIndex(1)+1);
+runIndices = runIndex(1):1:runIndex(2);
 
-hAxes = axes('Units','Pixels','Position',[axesXLoc,axesYLoc,xAxisRange,yAxisRange]);
+% Plot raw trace
+figure(1)
+hold on
+scatter(dvtWorld(:,1), dvtWorld(:,2), [], c)
+scatter(objPosWorld(1,1:2:end), objPosWorld(1,2:2:end), 'r', 'filled')
+title('Raw Trace in World Frame')
+colorbar
+hold off
 
-%%  GUI Initialization tasks
+figure(2)
+hold on
+scatter(dvtObject(:,1), dvtObject(:,2), [], c)
+scatter(objPosObject(1,1:2:end), objPosObject(1,2:2:end), 'r', 'filled')
+title('Raw Trace in Object Frame')
+colorbar
+hold off
 
-% Prompt for struct file
-[filename, pathname] = uigetfile('*.mat', 'Choose the processed dvt or scored file. (*.mat)');
-dvtFileName = fullfile(pathname, filename);
-% !!!!!! NOTE !!!!!!! Put in error catch in case they hit cancel here.
-% Load dvt file contents.
-indRecStruct = load(dvtFileName).indRecStruct;
-pixelDvt = indRecStruct.processedDVT;
+% Plot HDR over trial
+figure(3)
+hold on
+plot(runIndices, HDRWorld)
+ylim([-pi, pi])
+title('HDR over Run in World Frame')
+hold off
 
-% Sets the mouse back to "ignore-clicks-on-the-grid" mode.
-%stateResetter;
-%buttonResetter;
+figure(4)
+hold on
+plot(runIndices, HDRObject)
+ylim([-pi, pi])
+title('HDR over Run in Object Frame')
+hold off
 
-%STUB LOAD MOVIE HERE
-% [filename, pathname] = uigetfile('*.avi', 'Choose the video file.');
-% handles.aviFileName = fullfile(pathname, filename);
-% !!!!!! NOTE !!!!!!! Put in error catch in case the hit cancel here.
-
-% Change units to normalized so components resize automatically.
-set([hTimeSlider, hWindowTimeSizeLabel, hWindowTimeSize,...
-    hAxes,hAbort],'Units','normalized');
-
-% Assign the GUI a name to appear in the window title.
-set(overallWindow,'Name','Object Vector Run Tracker');
-% Move the GUI to the center of the screen.
-movegui(overallWindow,'center');
-%Draw first set of data using default values.
-drawPoints;
-% Make the GUI visible.
-guiReady = true;
-set(overallWindow,'Visible','on');
-
-%% Callbacks
-
-function abort_Callback(source,eventdata) %#ok<*INUSD>
-    % Abort whatever you are doing and return to the normal program
-    % state.
-    if get(hSelectAndRelabelRun,'Value') && ~isempty(eventBuffer)
-        % Write the event you are in the process of relabeling back to
-        % spiral events before deleting.
-        nEventsToAdd = size(eventBuffer,1);             %#ok<*NODEF>
-        eventCount = eventCount + nEventsToAdd;
-        if nEventsToAdd ==3
-            % Add the run markers to the spiral_events list.
-            events(eventCount-2:eventCount,:) = eventBuffer;
-            % Paint the tracking file appropriately.
-            pixelDvt(events(end-2,1):events(end-1,1),end) = ...
-                events(end-2,3);
-        else
-            % Add the run markers to the spiral_events list.
-            events(eventCount-1:eventCount,:) = eventBuffer;
-            % Paint the tracking file appropriately.
-            pixelDvt(events(end-1,1):events(end,1),end) = ...
-                events(end-1,3);
-        end
-    end
-
-    %stateResetter;
-    %buttonResetter;
-
-    set(hCleanRun,'Tag','0');
-
-    set(hMarkRun,'Value',0);
-    set(hCleanRun,'Value',0);
-    set(hDirtyRun,'Value',0);
-    set(hIndecisionPoint,'Value',0);     
-    set(hSelectAndRelabelRun,'Value',0);
-    set(hSelectAndEraseRun,'Value',0);
-    set(hSelectAndEraseEvent,'Value',0);
-    set(hPlotOnePathOnly,'Value',0);
+% Distance over time
+figure(5)
+hold on
+plot(runIndices, distWorld)
+title('Distance to Object')
+hold off
 
 
-    set(hMarkRun,'Enable','on');
-    set(hCleanRun,'Enable','off');
-    set(hDirtyRun,'Enable','off');
-    set(hIndecisionPoint,'Enable','on');
-
-    set(hSelectAndRelabelRun,'Enable','on');
-    set(hEraseLast,'Enable','on');
-    set(hSelectAndEraseRun,'Enable','on');
-    set(hSelectAndEraseEvent,'Enable','on');
-
-    %disableRunButtons;
-    set(hNoReward,'Enable','off');
-    set(hPlotOnePathOnly,'Enable','on');
-
-    drawPoints;
-end
-
-function timeSlider_Callback(source,eventdata)
-    % Replot data with new chosen time window.
-    drawPoints;
-end
-
-function windowTimeSize_Callback(source,eventdata)
-    % Replot data with new chosen time window size.
-    drawPoints;
-end
-
-%% Helper functions
-
-function [firstTimePoint, lastTimePoint, xColumn, yColumn, penColor] = statusSet()
-    % Returns the time window being viewed, the columns in the dvt file 
-    % of the light being used, and the appropriate pen color for the
-    % light.
-    currentStepSize = str2double(get(hWindowTimeSize,'String'));
-    totalTime = size(pixelDvt,1);
-    stepFraction = currentStepSize./totalTime;
-    set(hTimeSlider,'SliderStep',[stepFraction,stepFraction*10]);
-    firstTimePoint = min(round(get(hTimeSlider,'Value').*totalTime)+1,totalTime);
-    lastTimePoint = min(max(firstTimePoint-1+currentStepSize,1),totalTime);
-
-    xColumn = 9;
-    yColumn = 10;
-    penColor = [0,0.2,0];
-end
-
-    function drawPoints()
-        %Helper function that does all of the drawing work in the grid.
-        
-        % Get info about the status of the data in the interface.
-        [firstPoint, lastPoint, xLightCol, yLightCol, pen99] = statusSet();
-        
-        % Additional state info.
-        nClicks = str2double(get(hAxes,'Tag'));
-        axes(hAxes);
-        pen(99,:) = pen99;
-        changeStarts = [0;find(diff(pixelDvt(firstPoint:lastPoint,end)))];
-        changeEnds = [changeStarts(2:end);lastPoint-firstPoint-1];
-        drawnow;
-        hold off;
-        
-        %Actual plotting starts here.
-        cla;
-        hold on;
-        % Some plot formatting.
-        grid on;
-        set(hAxes,'TickLength',[0 0],'XTickLabel','','YTickLabel','');
-        axis([0,640,0,480]);
-
-        % Plots the labeled portions in the correct colors.
-        for iSegment = 1:length(changeStarts)
-            plot(pixelDvt(firstPoint+changeStarts(iSegment):firstPoint+changeEnds(iSegment),xLightCol),...
-                pixelDvt(firstPoint+changeStarts(iSegment):firstPoint+changeEnds(iSegment),yLightCol),'.','Color','black');
-        end
-        
-        % Plots the start and end points for the time segment.
-        plot(pixelDvt(firstPoint,xLightCol),...
-            pixelDvt(firstPoint,yLightCol),'g+','linewidth',3);
-        plot(pixelDvt(lastPoint,xLightCol),...
-            pixelDvt(lastPoint,yLightCol),'r+','linewidth',3);
-        set(hAxes,'Tag',num2str(nClicks)); %Deals with weird fact that the plot fn resets axes 'Tag' value to ''
-
-    end
-end

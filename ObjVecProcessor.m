@@ -11,12 +11,12 @@
 % Non-built-in functions called:
 %      inpaint_nans
 %
-% By Jingyue Xu, 202203317
+% By Jingyue Xu, 20220317
 % Adapted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
 clear
 
-% Prompt user to select file. Will save back to the same folder.
+% Prompt user to select file. Will save back to the same folder
 recDir = uigetdir;
 cd(recDir)
 [dvtFileName, dvtPathName] = uigetfile(fullfile(recDir, '*.dvt'), 'Choose the dvt file.');
@@ -129,6 +129,53 @@ indRecStruct.samplesUnfilled = samplesUnfilled;
 
 clear gap* iGap iLight lightCol* lostTrackingEdges unfixableGaps maxGap
 
+%% Process event markers
+% Obtain reward time and object markers
+objRaw = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
+Treward = objRaw{1:3:end, 5};
+objMarker = zeros(size(objRaw,1)/3, 8);
+objMarker(:,1) = round(Treward*60);
+objMarker(:,2) = Treward;
+objMarker(:,3:4) = objRaw{1:3:end, 7:8};
+objMarker(:,5:6) = objRaw{2:3:end, 7:8};
+objMarker(:,7:8) = objRaw{3:3:end, 7:8};
+
+% Process inner and outer runs, retain rewarded runs
+innerRaw = table2array(inrRaw(inrRaw.(1) == "inner" | inrRaw.(1) == "Inner", 5:6));
+innerTime = nan(size(innerRaw));
+for i = 1:size(innerRaw, 1)
+    if sum(Treward >= innerRaw(i,1) & Treward <= innerRaw(i,2)) > 0
+        innerTime(i,:) = innerRaw(i,:);
+    end
+end
+innerTime = innerTime(~isnan(innerTime));
+innerTime = reshape(innerTime, numel(innerTime)/2, 2);
+
+outerTime = zeros(length(innerTime)-1, 2);
+outerTime(:,1) = innerTime(1:end-1, 2);
+outerTime(:,2) = innerTime(2:end, 1);
+
+inner = repmat(innerTime, 1);
+inner = round(inner*60);
+outer = repmat(outerTime, 1);
+outer = round(outer*60);
+
+innerTime = [(1:size(innerTime,1))' innerTime];
+outerTime = [(1:size(outerTime,1))' outerTime];
+inner = [(1:size(inner,1))' inner];
+outer = [(1:size(outer,1))' outer];
+
+indRecStruct.event.innerTime = innerTime;
+indRecStruct.event.outerTime = outerTime;
+indRecStruct.event.inner = inner;
+indRecStruct.event.outer = outer;
+indRecStruct.event.rewardTime = objMarker;
+
+% Process clean runs moving on
+clean = false(size(innerTime, 1));
+
+clear objRaw Treward innerRaw innerTime outer*
+
 %% Create a "light" and add to DVT matrix that is the average of the first two lights.
 % Var Init
 avgLight = nRealLights+1; % Adding the average of the lights as a 'light'.
@@ -181,25 +228,18 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 %% Process object markers into object location data
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 
-rawObjMarker = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
-for i = (1:size(rawObjMarker,1)/3)-1
-    tMarker = rawObjMarker{3*i+1,5};
-    objPosition1 = rawObjMarker{3*i+1,7:8};
-    objPosition2 = rawObjMarker{3*i+2,7:8};
-    objPosition3 = rawObjMarker{3*i+3,7:8};
-    iMarker = round(tMarker*60);
-    objPosition(iMarker:end,1) = objPosition1(1)*640/1024; % columns 1, 2 are x, y positions for the light at arm A (right side of the angle) of the object
-    objPosition(iMarker:end,2) = objPosition1(2)*480/768;
-    objPosition(iMarker:end,3) = objPosition2(1)*640/1024; % columns 3, 4 are x, y positions for the light at the vertex of the object
-    objPosition(iMarker:end,4) = objPosition2(2)*480/768;
-    objPosition(iMarker:end,5) = objPosition3(1)*640/1024; % columns 5, 6 are x, y positions for the light at arm B (left side of the angle) of the object
-    objPosition(iMarker:end,6) = objPosition3(2)*480/768;
+for i = 1:size(inner,1)
+    iMarker = inner(i,2);
+    objPosition(iMarker:end,1) = objMarker(i,3)*640/1024; % columns 3, 4 are x, y positions for the light at arm A (right side of the angle) of the object
+    objPosition(iMarker:end,2) = objMarker(i,4)*480/768;
+    objPosition(iMarker:end,3) = objMarker(i,5)*640/1024; % columns 5, 6 are x, y positions for the light at the vertex of the object
+    objPosition(iMarker:end,4) = objMarker(i,6)*480/768;
+    objPosition(iMarker:end,5) = objMarker(i,7)*640/1024; % columns 7, 8 are x, y positions for the light at arm B (left side of the angle) of the object
+    objPosition(iMarker:end,6) = objMarker(i,8)*480/768;
 end
 
 objPosition = [processedDVT(:,1:2) objPosition];
 indRecStruct.world.objPosition = objPosition;
-
-clear tMarker objPosition1 objPosition2 objPosition3 iMarker
 
 %% Create relative DVT for object-centered position
 % Apply a transformation matrix to rotate DVT to object-relative position
@@ -245,19 +285,6 @@ objPositionRel = [processedDVT(:,1:2) objPositionRel];
 indRecStruct.object.processedDVT = workingDVTRel;
 indRecStruct.object.objPosition = objPositionRel;
 
-clear vecAxy theta
-
-%% Calculate absolute distance to object (vertex)
-distance = zeros(size(processedDVT,1),4);
-distance(:,1:2) = processedDVT(:,1:2);
-distance(:,3) = sqrt((processedDVT(:,9)-objPosition(:,3)).^2 + (processedDVT(:,10)-objPosition(:,4)).^2);
-posVec = processedDVT(:,9:10)-objPosition(:,3:4);
-distance(:,4) = atan2(posVec(:,2), posVec(:,1));
-
-indRecStruct.world.distanceToObj = distance;
-
-clear posVec
-
 %% Velocity & Acceleration - Averaged over adaptable window (updated with object-centered direction)
 % Initialize window size to use - can change here if desired.
 velSmoothWinSecs = 1/10; % Uses position change over X sec to calc vel.
@@ -269,12 +296,12 @@ acc = nan(length(vel)-1,2,nRealLights); % Compare point by point vel since they 
 instVel = nan(length(processedDVT)-1,2,nRealLights); % Instantaneous (sample rate) velocity
 instAcc = nan(length(instVel)-1,2,nRealLights); % Compare point by point vel since they are already smoothed.
 
-velRel = vel;
-accRel = acc;
-instVelRel = instVel;
-instAccRel = instAcc;
+velRel = nan(size(vel));
+accRel = nan(size(acc));
+instVelRel = nan(size(instVel));
+instAccRel = nan(size(instAcc));
 
-vecAxy = objPosition(:,1:2) - objPosition(:,3:4); % Get array of object directions
+vecAxy = objPosition(:,3:4) - objPosition(:,5:6); % Get array of object directions
 theta = -atan2(vecAxy(:,2),vecAxy(:,1));
 
 for iLight = 1:nRealLights
@@ -308,11 +335,22 @@ for iLight = 1:nRealLights
     % Store relative orientations
     velDirectionRel = velDirection + theta(1:length(velDirection));
     velRel(:,:,iLight) = [velMag,velDirectionRel];
+    velRel(velRel > pi) = rem(velRel(velRel > pi), pi);
+    velRel(velRel < -pi) = rem(velRel(velRel < -pi), pi);
+
     accDirectionRel = accDirection + theta(1:length(accDirection));
     accRel(:,:,iLight) = [accMag,accDirectionRel];
+    accRel(accRel > pi) = rem(accRel(accRel > pi), pi);
+    accRel(accRel < -pi) = rem(accRel(accRel < -pi), pi);
+
     instVelDirectionRel = instVelDirection + theta(1:length(instVelDirection));
+    instVelDirectionRel(instVelDirectionRel > pi) = rem(instVelDirectionRel(instVelDirectionRel > pi), pi);
+    instVelDirectionRel(instVelDirectionRel < -pi) = rem(instVelDirectionRel(instVelDirectionRel < -pi), pi);
     instVelRel(:,:,iLight) = [instVelMag,instVelDirectionRel];
+
     instAccDirectionRel = instAccDirection + theta(1:length(instAccDirection));
+    instAccDirectionRel(instAccDirectionRel > pi) = rem(instAccDirectionRel(instAccDirectionRel > pi), pi);
+    instAccDirectionRel(instAccDirectionRel < -pi) = rem(instAccDirectionRel(instAccDirectionRel < -pi), pi);
     instAccRel(:,:,iLight) = [instAccMag,instAccDirectionRel];
 end
 
@@ -327,7 +365,7 @@ indRecStruct.object.velSmoothed = velRel;
 indRecStruct.object.accSmoothed = accRel;
 
 clear bufferDistance iPos iLight light* xyDiff speed*  velMag ...
-    velDirection accMag accDirection
+    velDirection* accMag accDirection*
 
 %% Head Direction
 light1 = processedDVT(:,3:4);
@@ -337,40 +375,64 @@ posDiff = light1-light2;
 HDRadians = atan2(posDiff(:,2),posDiff(:,1));
 HDRadians((samplesLost(:,1) & ~samplesFilled(:,1)) | ...
     (samplesLost(:,2) & ~samplesFilled(:,2))) = NaN;
-
 indRecStruct.world.HDRadians = HDRadians;
 
 % Relative Head Direction
 HDRadiansRel = HDRadians + theta(1:length(HDRadians));
+HDRadiansRel(HDRadiansRel > pi) = rem(HDRadiansRel(HDRadiansRel > pi), pi);
+HDRadiansRel(HDRadiansRel < -pi) = rem(HDRadiansRel(HDRadiansRel < -pi), pi);
 indRecStruct.object.HDRadians = HDRadiansRel;
 
 % Output Check Code
 % [count,center] = hist(HDRadians,36);
 % sortedRows = sortrows([count;center]',1);
 
-clear posDiff light* vecAxy theta
+clear posDiff light* vecAxy theta objVecRel
 
-%% Process inner run event markers
-inner = table2array(inrRaw(inrRaw.(1) == "inner" | inrRaw.(1) == "Inner", 5:6));
-outer = zeros(length(inner)-1, 2);
-outer(:,1) = inner(1:end-1, 2);
-outer(:,2) = inner(2:end, 1);
+%% Object-vector
+disp = processedDVT(:,9:10) - objPosition(:,5:6); % Displacement vector between mash-up and object vertex
+objVec = zeros(size(processedDVT,1),4);
+objVec(:,1:2) = processedDVT(:,1:2);
+[objVec(:,3), objVec(:,4)] = cart2pol(disp(:,1), disp(:,2));
+objVecRel = repmat(objVec, 1);
+objVecRel(:,3) = HDRadiansRel;
 
-indRecStruct.event.inner = inner;
-indRecStruct.event.outer = outer;
+indRecStruct.world.objVec = objVec;
+indRecStruct.object.objVec = objVecRel;
 
-clear inner outer
+clear processedDVT
 
-%% Process spike time data
-indRecStruct.spike = spkRaw;
+%% Process pre- and post-reward phases
+preReward = zeros(size(inner));
+preReward(:,1:2) = inner(:,1:2);
+postReward = zeros(size(inner));
+postReward(:,[1,3]) = inner(:,[1,3]);
+
+meanArmL = mean([vecnorm((objMarker(:,3:4)-objMarker(:,5:6))'), vecnorm((objMarker(:,7:8)-objMarker(:,5:6))')])/2;
+
+for i = 1:size(inner, 1)
+    iReward = objMarker(i,1);
+    preReward(i,3) = find((objVec(1:iReward,4) >= meanArmL) & (vel(1:iReward,1,1) >= 100) & (vel(1:iReward,1,2) >= 100), 1, 'last');
+    postReward(i,2) = iReward + find((objVec(iReward:size(vel,1),4) >= meanArmL) & (vel(iReward:end,1,1) >= 100) & (vel(iReward:end,1,2) >= 100), 1);
+end
+
+indRecStruct.event.preReward = preReward;
+indRecStruct.event.postReward = postReward;
+indRecStruct.event.runNumber = size(inner,1);
+
+clear inner objVec objMarker preReward postReward
 
 %% Save results - indRecStruct
+indRecStruct.event.clean = clean;
+indRecStruct.spike = spkRaw;
+
 args = input('Save data? yes/no (y/n)','s');
 if (args == "yes") | (args == 'y') %#ok<OR2>
     save(fullfile(dvtPathName,strcat(dvtFileName(1:end-4),'_indRecStruct')), 'indRecStruct');
 end
 
 clear args
+
 %% Visualize tracking and object position data
 args = input('Plot data? yes/no (y/n)','s');
 if (args == "yes") | (args == 'y') %#ok<OR2>
