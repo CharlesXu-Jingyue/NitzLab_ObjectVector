@@ -169,7 +169,27 @@ indRecStruct.event.innerTime = innerTime;
 indRecStruct.event.outerTime = outerTime;
 indRecStruct.event.inner = inner;
 indRecStruct.event.outer = outer;
-indRecStruct.event.rewardTime = objMarker;
+
+% % Object configuration - using KNN to classify object configuration
+% 
+% % Construct a prior
+% x1 = [450; 500; 500; 450; 450; 500; 500; 450; 680; 740; 740; 680; 680; 740; 740; 680; 450; 450; 630; 550; 740; 740; 550; 635; 560; 620; 620; 560];
+% y1 = [280; 280; 220; 220; 525; 525; 465; 465; 525; 525; 465; 465; 280; 280; 220; 220; 415; 340; 530; 500; 345; 425; 240; 240; 410; 410; 350; 350];
+% x2 = [500; 500; 450; 450; 500; 500; 450; 450; 740; 740; 680; 680; 740; 740; 680; 680; 480; 420; 590; 585; 700; 770; 595; 595; 620; 620; 560; 560];
+% y2 = [280; 220; 220; 280; 525; 465; 465; 525; 525; 465; 465; 525; 280; 220; 220; 280; 375; 375; 500; 540; 380; 380; 265; 210; 410; 350; 350; 410];
+% Class = ["A1"; "A2"; "A3"; "A4"; "B1"; "B2"; "B3"; "B4"; "C1"; "C2"; "C3"; "C4";
+%     "D1"; "D2"; "D3"; "D4"; "Ei"; "Eo"; "Fi"; "Fo"; "Gi"; "Go"; "Hi"; "Ho"; "J1"; "J2"; "J3"; "J4"];
+% prior = table(x1, y1, x2, y2, Class);
+% knn = fitcknn(prior, 'Class'); % Fit KNN
+% X = objMarker(1,3:6);
+% label = predict(knn, X);
+% 
+% for i = 1:size(objMarker,1)
+%     vecAxy = objMarker(i,3:4) - objMarker(i,5:6);
+%     theta = -atan2(vecAxy(2),vecAxy(1));
+% end
+
+indRecStruct.event.reward = objMarker;
 
 % Process clean runs moving on
 clean = false(size(innerTime, 1));
@@ -226,6 +246,9 @@ indRecStruct.world.processedDVT = processedDVT;
 clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 
 %% Process object markers into object location data
+% Plexon Studio encodes location in a 1024*768 resolution, this block
+% converts is to the camera's 640*480 resolution
+
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 
 for i = 1:size(inner,1)
@@ -412,8 +435,8 @@ meanArmL = mean([vecnorm((objMarker(:,3:4)-objMarker(:,5:6))'), vecnorm((objMark
 
 for i = 1:size(inner, 1)
     iReward = objMarker(i,1);
-    preReward(i,3) = find((objVec(1:iReward,4) >= meanArmL) & (vel(1:iReward,1,1) >= 100) & (vel(1:iReward,1,2) >= 100), 1, 'last');
-    postReward(i,2) = iReward + find((objVec(iReward:size(vel,1),4) >= meanArmL) & (vel(iReward:end,1,1) >= 100) & (vel(iReward:end,1,2) >= 100), 1);
+    preReward(i,3) = find((objVec(1:iReward,4) >= meanArmL*1.5), 1, 'last');
+    postReward(i,2) = iReward + find((objVec(iReward:size(vel,1),4) >= meanArmL*1.5), 1);
 end
 
 indRecStruct.event.preReward = preReward;
@@ -423,7 +446,6 @@ indRecStruct.event.runNumber = size(inner,1);
 clear inner objVec objMarker preReward postReward
 
 %% Save results - indRecStruct
-indRecStruct.event.clean = clean;
 indRecStruct.spike = spkRaw;
 
 args = input('Save data? yes/no (y/n)','s');
