@@ -1,0 +1,5 @@
+%% ObjVecPosTuning
+% ObjVecPosTuning performs positional tuning analysis, including the
+% occupancy map, rate map, and positional information.
+%
+% Input: indRecStruct

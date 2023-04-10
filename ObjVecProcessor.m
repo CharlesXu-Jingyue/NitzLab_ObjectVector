@@ -1,3 +1,4 @@
+function ObjVecProcessor
 %% ObjVecProcessor
 % ObjVecProcessor takes in a dvt file, the event csv files, and a spike
 % data mat file and writes a .mat file with a name starting with the name
@@ -130,45 +131,66 @@ indRecStruct.samplesUnfilled = samplesUnfilled;
 clear gap* iGap iLight lightCol* lostTrackingEdges unfixableGaps maxGap
 
 %% Process event markers
-% Obtain reward time and object markers
-objRaw = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
-Treward = objRaw{1:3:end, 5};
-objMarker = zeros(size(objRaw,1)/3, 8);
-objMarker(:,1) = round(Treward*60);
-objMarker(:,2) = Treward;
-objMarker(:,3:4) = objRaw{1:3:end, 7:8};
-objMarker(:,5:6) = objRaw{2:3:end, 7:8};
-objMarker(:,7:8) = objRaw{3:3:end, 7:8};
+% Obtain reward index and time
+objectRaw = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
+tReward = objectRaw{1:3:end, 5};
+
+nReward = numel(tReward);
+tReward = [repelem((size(workingDVT,1)+1), nReward)', tReward];
+sortReward = [workingDVT(:,1:2); tReward];
+sortReward = sortrows(sortReward, 2);
+indReward = (sortReward(:,1) - (1:size(sortReward, 1))') > 0;
+iReward = nonzeros(indReward .* (1:size(sortReward, 1))') - (1:nReward)';
+tReward(:,1) = iReward;
+
+% Obtain reward markers
+objMarker = zeros(size(objectRaw,1)/3, 8);
+objMarker(:,1:2) = tReward;
+objMarker(:,3:4) = objectRaw{1:3:end, 7:8};
+objMarker(:,5:6) = objectRaw{2:3:end, 7:8};
+objMarker(:,7:8) = objectRaw{3:3:end, 7:8};
+objMarker = [(1:size(objMarker,1))' objMarker];
 
 % Process inner and outer runs, retain rewarded runs
 innerRaw = table2array(inrRaw(inrRaw.(1) == "inner" | inrRaw.(1) == "Inner", 5:6));
-innerTime = nan(size(innerRaw));
+tInner = nan(size(innerRaw));
 for i = 1:size(innerRaw, 1)
-    if sum(Treward >= innerRaw(i,1) & Treward <= innerRaw(i,2)) > 0
-        innerTime(i,:) = innerRaw(i,:);
+    if sum(tReward(:,2) >= innerRaw(i,1) & tReward(:,2) <= innerRaw(i,2)) > 0 % Only keep rewarded runs
+        tInner(i,:) = innerRaw(i,:);
     end
 end
-innerTime = innerTime(~isnan(innerTime));
-innerTime = reshape(innerTime, numel(innerTime)/2, 2);
+tInner = tInner(~isnan(tInner));
+tInner = reshape(tInner, numel(tInner)/2, 2);
 
-outerTime = zeros(length(innerTime)-1, 2);
-outerTime(:,1) = innerTime(1:end-1, 2);
-outerTime(:,2) = innerTime(2:end, 1);
+tOuter = zeros(length(tInner)-1, 2);
+tOuter(:,1) = tInner(1:end-1, 2);
+tOuter(:,2) = tInner(2:end, 1);
 
-inner = repmat(innerTime, 1);
-inner = round(inner*60);
-outer = repmat(outerTime, 1);
-outer = round(outer*60);
+iInner = tInner(:);
+iInner = [repelem((size(workingDVT,1)+1), size(iInner, 1))' iInner];
+sortInner = [workingDVT(:,1:2); iInner];
+sortInner = sortrows(sortInner, 2);
+indInner = (sortInner(:,1) - (1:size(sortInner, 1))') > 0;
+iInner = nonzeros(indInner .* (1:size(sortInner, 1))') - (1:size(iInner, 1))';
+iInner = reshape(iInner, [size(tInner, 2) size(tInner, 1)])';
 
-innerTime = [(1:size(innerTime,1))' innerTime];
-outerTime = [(1:size(outerTime,1))' outerTime];
-inner = [(1:size(inner,1))' inner];
-outer = [(1:size(outer,1))' outer];
+iOuter = tOuter(:);
+iOuter = [repelem((size(workingDVT,1)+1), size(iOuter, 1))' iOuter];
+sortOuter = [workingDVT(:,1:2); iOuter];
+sortOuter = sortrows(sortOuter, 2);
+indOuter = (sortOuter(:,1) - (1:size(sortOuter, 1))') > 0;
+iOuter = nonzeros(indOuter .* (1:size(sortOuter, 1))') - (1:size(iOuter, 1))';
+iOuter = reshape(iOuter, [size(tOuter, 2) size(tOuter, 1)])';
 
-indRecStruct.event.innerTime = innerTime;
-indRecStruct.event.outerTime = outerTime;
-indRecStruct.event.inner = inner;
-indRecStruct.event.outer = outer;
+tInner = [(1:size(tInner,1))' tInner];
+tOuter = [(1:size(tOuter,1))' tOuter];
+iInner = [(1:size(iInner,1))' iInner];
+iOuter = [(1:size(iOuter,1))' iOuter];
+
+indRecStruct.event.tInner = tInner;
+indRecStruct.event.tOuter = tOuter;
+indRecStruct.event.iInner = iInner;
+indRecStruct.event.iOuter = iOuter;
 
 % % Object configuration - using KNN to classify object configuration
 % 
@@ -192,9 +214,9 @@ indRecStruct.event.outer = outer;
 indRecStruct.event.reward = objMarker;
 
 % Process clean runs moving on
-clean = false(size(innerTime, 1));
 
-clear objRaw Treward innerRaw innerTime outer*
+clear objRaw tReward nReward iReward ind sortReward sortInner sortOuter ...
+    indInner indOuter indReward innerRaw tInner tOuter outer*
 
 %% Create a "light" and add to DVT matrix that is the average of the first two lights.
 % Var Init
@@ -251,14 +273,14 @@ clear iLight lightCol* workingDVT mashupLight thisLightIsGood notPerfectTracking
 
 objPosition = zeros(size(processedDVT,1),6); % Getting object positions throughout recording
 
-for i = 1:size(inner,1)
-    iMarker = inner(i,2);
-    objPosition(iMarker:end,1) = objMarker(i,3)*640/1024; % columns 3, 4 are x, y positions for the light at arm A (right side of the angle) of the object
-    objPosition(iMarker:end,2) = objMarker(i,4)*480/768;
-    objPosition(iMarker:end,3) = objMarker(i,5)*640/1024; % columns 5, 6 are x, y positions for the light at the vertex of the object
-    objPosition(iMarker:end,4) = objMarker(i,6)*480/768;
-    objPosition(iMarker:end,5) = objMarker(i,7)*640/1024; % columns 7, 8 are x, y positions for the light at arm B (left side of the angle) of the object
-    objPosition(iMarker:end,6) = objMarker(i,8)*480/768;
+for i = 1:size(iInner,1)
+    iMarker = iInner(i,2);
+    objPosition(iMarker:end,1) = objMarker(i,4)*(640/1024); % columns 4, 5 are x, y positions for the light at arm A (right side of the angle) of the object
+    objPosition(iMarker:end,2) = objMarker(i,5)*(480/768);
+    objPosition(iMarker:end,3) = objMarker(i,6)*(640/1024); % columns 5, 7 are x, y positions for the light at the vertex of the object
+    objPosition(iMarker:end,4) = objMarker(i,7)*(480/768);
+    objPosition(iMarker:end,5) = objMarker(i,8)*(640/1024); % columns 8, 9 are x, y positions for the light at arm B (left side of the angle) of the object
+    objPosition(iMarker:end,6) = objMarker(i,9)*(480/768);
 end
 
 objPosition = [processedDVT(:,1:2) objPosition];
@@ -388,7 +410,7 @@ indRecStruct.object.velSmoothed = velRel;
 indRecStruct.object.accSmoothed = accRel;
 
 clear bufferDistance iPos iLight light* xyDiff speed*  velMag ...
-    velDirection* accMag accDirection*
+    velDirection* accMag accDirection* inst*
 
 %% Head Direction
 light1 = processedDVT(:,3:4);
@@ -410,7 +432,7 @@ indRecStruct.object.HDRadians = HDRadiansRel;
 % [count,center] = hist(HDRadians,36);
 % sortedRows = sortrows([count;center]',1);
 
-clear posDiff light* vecAxy theta objVecRel
+clear posDiff light* vecAxy theta HDRadians
 
 %% Object-vector
 disp = processedDVT(:,9:10) - objPosition(:,5:6); % Displacement vector between mash-up and object vertex
@@ -423,27 +445,27 @@ objVecRel(:,3) = HDRadiansRel;
 indRecStruct.world.objVec = objVec;
 indRecStruct.object.objVec = objVecRel;
 
-clear processedDVT
+clear disp processedDVT HDRadiansRel objVecRel
 
 %% Process pre- and post-reward phases
-preReward = zeros(size(inner));
-preReward(:,1:2) = inner(:,1:2);
-postReward = zeros(size(inner));
-postReward(:,[1,3]) = inner(:,[1,3]);
+preReward = zeros(size(iInner));
+preReward(:,1:2) = iInner(:,1:2);
+postReward = zeros(size(iInner));
+postReward(:,[1,3]) = iInner(:,[1,3]);
 
-meanArmL = mean([vecnorm((objMarker(:,3:4)-objMarker(:,5:6))'), vecnorm((objMarker(:,7:8)-objMarker(:,5:6))')])/2;
+meanArmL = mean([vecnorm((objMarker(:,3:4)-objMarker(:,6:7))'), vecnorm((objMarker(:,8:9)-objMarker(:,5:6))')])/2;
 
-for i = 1:size(inner, 1)
-    iReward = objMarker(i,1);
+for i = 1:size(iInner, 1)
+    iReward = objMarker(i,2);
     preReward(i,3) = find((objVec(1:iReward,4) >= meanArmL*1.5), 1, 'last');
     postReward(i,2) = iReward + find((objVec(iReward:size(vel,1),4) >= meanArmL*1.5), 1);
 end
 
 indRecStruct.event.preReward = preReward;
 indRecStruct.event.postReward = postReward;
-indRecStruct.event.runNumber = size(inner,1);
+indRecStruct.event.runNumber = size(iInner,1);
 
-clear inner objVec objMarker preReward postReward
+clear iInner objVec objMarker preReward postReward meanArmL
 
 %% Save results - indRecStruct
 indRecStruct.spike = spkRaw;

@@ -13,7 +13,9 @@ cd(recDir)
 [matFileName, matPathName] = uigetfile(fullfile(recDir, '*indRecStruct.mat'), 'Choose the mat file.');
 load(fullfile(matPathName, matFileName))
 figSaveDir = fullfile(string(recDir) + filesep + "HDTuningCurves");
-mkdir(figSaveDir)
+if ~exist(figSaveDir, 'dir')
+   mkdir(figSaveDir)
+end
 
 frameRef = ["World", "Object"];
 for i = 1:length(frameRef)
@@ -82,3 +84,5 @@ for i = 1:length(frameRef)
         pause(1)
     end
 end
+
+% Add Rayleigh Test for HD tuning
