@@ -18,7 +18,7 @@ dvtObj(dvtObj==1) = NaN;
 dvtObj(1,1) = 1;
 objPosWorld = indRecStruct.world.objPosition;
 objPosObj = indRecStruct.object.objPosition;
-inner = indRecStruct.event.inner;
+iInner = indRecStruct.event.iInner;
 
 width = 600; % specify resolution
 height = 600;
@@ -26,11 +26,11 @@ gridSize = 10; % specify grid size
 runNum = 29; % specify event number to plot
 
 %% Create occupancy map (Update to get occupancy map for each inner run)
-if runNum <= size(inner,1)
-    dvtWorldRun = dvtWorld(dvtWorld(:,2)>=inner(runNum,1) & dvtWorld(:,2)<=inner(runNum,2),:);
-    dvtObjRun = dvtObj(dvtObj(:,2)>=inner(runNum,1) & dvtObj(:,2)<=inner(runNum,2),:);
-    objPosWorldRun = objPosWorld(find(objPosWorld(:,2)>inner(runNum,1),1,'first'),:);
-    objPosObjRun = objPosObj(find(objPosObj(:,2)>inner(runNum,1),1,'first'),:);
+if runNum <= size(iInner,1)
+    dvtWorldRun = dvtWorld(dvtWorld(:,2)>=iInner(runNum,1) & dvtWorld(:,2)<=iInner(runNum,2),:);
+    dvtObjRun = dvtObj(dvtObj(:,2)>=iInner(runNum,1) & dvtObj(:,2)<=iInner(runNum,2),:);
+    objPosWorldRun = objPosWorld(find(objPosWorld(:,2)>iInner(runNum,1),1,'first'),:);
+    objPosObjRun = objPosObj(find(objPosObj(:,2)>iInner(runNum,1),1,'first'),:);
     
     % Raw trace in world-centered view
     figure
@@ -42,11 +42,11 @@ if runNum <= size(inner,1)
     hold off
     
     % Occupancy matrix in world coordinates
-    hWorld = hist3(dvtWorldRun(:,3:4),'Edges',{(1:gridSize:width)-1,(1:gridSize:height)-1});
+    hWorld = hist3(dvtWorldRun(:,3:4), 'Edges', {(1:gridSize:width)-1, (1:gridSize:height)-1});
     % Plot occupancy map
     figure
     hold on
-    hist3(dvtWorldRun(:,3:4),'Edges',{(1:gridSize:width)-1,(1:gridSize:height)-1},'CDataMode','auto')
+    hist3(dvtWorldRun(:,3:4), 'Edges', {(1:gridSize:width)-1, (1:gridSize:height)-1}, 'CDataMode', 'auto')
     scatter(objPosWorldRun([3 5 7]), objPosWorldRun([4 6 8]), 'y', 'filled')
     ylabel('Door Side')
     colorbar
@@ -55,11 +55,11 @@ if runNum <= size(inner,1)
     hold off
 
     % Occupancy matrix in object-centered coordinates
-    hObj = hist3(dvtObjRun(:,3:4),'Edges',{(1:gridSize:width)-1,(1:gridSize:height)-1});
+    hObj = hist3(dvtObjRun(:,3:4), 'Edges', {(1:gridSize:width)-1, (1:gridSize:height)-1});
     % Plot occupancy map
     figure
     hold on
-    hist3(dvtObjRun(:,3:4),'Edges',{(-width:gridSize:width)-1,(-height:gridSize:height)-1},'CDataMode','auto')
+    hist3(dvtObjRun(:,3:4), 'Edges', {(-width:gridSize:width)-1, (-height:gridSize:height)-1}, 'CDataMode', 'auto')
     scatter(objPosObjRun([3 5 7]), objPosObjRun([4 6 8]), 'y', 'filled')
     ylabel('Door Side')
     colorbar

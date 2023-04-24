@@ -12,7 +12,7 @@ recDir = uigetdir;
 cd(recDir)
 [matFileName, matPathName] = uigetfile(fullfile(recDir, '*indRecStruct.mat'), 'Choose the mat file.');
 load(fullfile(matPathName, matFileName))
-figSaveDir = fullfile(string(recDir) + filesep + "HDTuningCurves");
+figSaveDir = fullfile(string(recDir) + filesep + "HDTuning");
 if ~exist(figSaveDir, 'dir')
    mkdir(figSaveDir)
 end
@@ -44,10 +44,10 @@ for i = 1:length(frameRef)
     % Angular bins
     da = pi/30; %6 degrees
     angBins = [-pi+da/2:da:pi-da/2]; %#ok<NBRAK>
-    ang = [processedDVT(:, 2),HDRadians(: ,1)];
+    ang = [processedDVT(:,2), HDRadians(:,1)];
 
     % Occupancy
-    histAng = hist(ang(:, 2), angBins); %#ok<HIST>
+    histAng = hist(ang(:,2), angBins); %#ok<HIST>
 
     % Which cell to plot
     for iCell = 1:length(variableCell)

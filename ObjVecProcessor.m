@@ -16,8 +16,10 @@ function ObjVecProcessor
 % Adapted from TTTrackingPreprocessor.m by Jake Olson, October 2014
 
 clear
+close all
 
 % Prompt user to select file. Will save back to the same folder
+currectDir = pwd;
 recDir = uigetdir;
 cd(recDir)
 [dvtFileName, dvtPathName] = uigetfile(fullfile(recDir, '*.dvt'), 'Choose the dvt file.');
@@ -136,7 +138,7 @@ objectRaw = objRaw(objRaw.(1) == "lego" | objRaw.(1) == "Lego" ,:);
 tReward = objectRaw{1:3:end, 5};
 
 nReward = numel(tReward);
-tReward = [repelem((size(workingDVT,1)+1), nReward)', tReward];
+tReward = [repelem((size(workingDVT,1)+size(tReward,1)+1), nReward)', tReward];
 sortReward = [workingDVT(:,1:2); tReward];
 sortReward = sortrows(sortReward, 2);
 indReward = (sortReward(:,1) - (1:size(sortReward, 1))') > 0;
@@ -167,7 +169,7 @@ tOuter(:,1) = tInner(1:end-1, 2);
 tOuter(:,2) = tInner(2:end, 1);
 
 iInner = tInner(:);
-iInner = [repelem((size(workingDVT,1)+1), size(iInner, 1))' iInner];
+iInner = [repelem((size(workingDVT,1)+size(iInner,1)+1), size(iInner, 1))' iInner];
 sortInner = [workingDVT(:,1:2); iInner];
 sortInner = sortrows(sortInner, 2);
 indInner = (sortInner(:,1) - (1:size(sortInner, 1))') > 0;
@@ -175,7 +177,7 @@ iInner = nonzeros(indInner .* (1:size(sortInner, 1))') - (1:size(iInner, 1))';
 iInner = reshape(iInner, [size(tInner, 2) size(tInner, 1)])';
 
 iOuter = tOuter(:);
-iOuter = [repelem((size(workingDVT,1)+1), size(iOuter, 1))' iOuter];
+iOuter = [repelem((size(workingDVT,1)+size(iOuter,1)+1), size(iOuter, 1))' iOuter];
 sortOuter = [workingDVT(:,1:2); iOuter];
 sortOuter = sortrows(sortOuter, 2);
 indOuter = (sortOuter(:,1) - (1:size(sortOuter, 1))') > 0;
@@ -505,6 +507,7 @@ if (args == "yes") | (args == 'y') %#ok<OR2>
     end
 end
 
+cd(currectDir)
 %% Notes
 
 % -[x] Make three lights on the object
